@@ -25,6 +25,9 @@ pub enum ThemePreset {
     SolarizedLight,
     FlexokiDark,
     FlexokiLight,
+    /// Terminal palette only: every colour is one of the 16 ANSI slots, so the
+    /// terminal's configured scheme (Ghostty monokai) drives the whole UI.
+    Ansi,
 }
 
 impl FromStr for ThemePreset {
@@ -45,8 +48,9 @@ impl FromStr for ThemePreset {
             "solarized-light" => Ok(Self::SolarizedLight),
             "flexoki-dark" => Ok(Self::FlexokiDark),
             "flexoki-light" => Ok(Self::FlexokiLight),
+            "ansi" | "terminal" | "monokai-terminal" => Ok(Self::Ansi),
             _ => Err(format!(
-                "Unknown theme '{}'. Valid: default-dark, default-light, catppuccin-mocha, catppuccin-latte, dracula, nord, gruvbox-dark, gruvbox-light, one-dark, solarized-dark, solarized-light, flexoki-dark, flexoki-light",
+                "Unknown theme '{}'. Valid: default-dark, default-light, catppuccin-mocha, catppuccin-latte, dracula, nord, gruvbox-dark, gruvbox-light, one-dark, solarized-dark, solarized-light, flexoki-dark, flexoki-light, ansi",
                 s
             )),
         }
@@ -279,6 +283,73 @@ impl Theme {
             ThemePreset::SolarizedLight => Self::solarized_light(),
             ThemePreset::FlexokiDark => Self::flexoki_dark(),
             ThemePreset::FlexokiLight => Self::flexoki_light(),
+            ThemePreset::Ansi => Self::ansi(),
+        }
+    }
+
+    /// Terminal-palette theme. Every colour is an ANSI slot (0-15) or
+    /// `Color::Reset`, so it always matches the terminal's configured scheme.
+    /// Values assume the monokai palette used by Ghostty/croft: slot 8 is the
+    /// muted comment grey #75715e, slot 10 is green #a6e22e, slot 11 is yellow
+    /// #e6db74, slot 6 is cyan #66d9ef, slot 1 is the pink/red #f92a72.
+    pub fn ansi() -> Self {
+        Self {
+            mode: ThemeMode::Dark,
+            syntax: SyntaxColors {
+                comment: Color::DarkGray,
+                keyword: Color::Red,
+                string: Color::LightYellow,
+                number: Color::Blue,
+                function: Color::LightGreen,
+                function_macro: Color::Cyan,
+                r#type: Color::LightCyan,
+                variable_builtin: Color::Red,
+                variable_member: Color::Cyan,
+                module: Color::Yellow,
+                operator: Color::Red,
+                tag: Color::LightGreen,
+                attribute: Color::LightCyan,
+                label: Color::Yellow,
+                punctuation: Color::Gray,
+                default_text: Color::White,
+            },
+            diff: DiffColors {
+                added_bg: Color::Green,
+                added_gutter_bg: Color::LightGreen,
+                added_gutter_fg: Color::Black,
+                deleted_bg: Color::Red,
+                deleted_gutter_bg: Color::LightRed,
+                deleted_gutter_fg: Color::Black,
+                context_bg: Color::Reset,
+                empty_placeholder_fg: Color::DarkGray,
+                added_word_bg: Color::LightGreen,
+                deleted_word_bg: Color::LightRed,
+            },
+            ui: UiColors {
+                border_focused: Color::Yellow,
+                border_unfocused: Color::DarkGray,
+                text_primary: Color::White,
+                text_secondary: Color::Gray,
+                text_muted: Color::DarkGray,
+                line_number: Color::DarkGray,
+                bg: Color::Reset,
+                footer_branch_bg: Color::Blue,
+                footer_branch_fg: Color::White,
+                status_added: Color::Green,
+                status_modified: Color::Yellow,
+                status_deleted: Color::Red,
+                stats_added: Color::LightGreen,
+                stats_removed: Color::LightRed,
+                selection_bg: Color::Cyan,
+                selection_fg: Color::Black,
+                highlight: Color::Yellow,
+                viewed: Color::Green,
+                watching: Color::Yellow,
+                search_match_bg: Color::Blue,
+                search_match_fg: Color::White,
+                search_current_bg: Color::Yellow,
+                search_current_fg: Color::Black,
+            },
         }
     }
 
