@@ -603,6 +603,9 @@ fn run_app_internal(
                     if key.kind == KeyEventKind::Press && state.search_state.is_active() =>
                 {
                     match key.code {
+                        // Cmd+Up quits from the search box too, so the back key
+                        // works wherever the diff view has focus.
+                        KeyCode::Up if key.modifiers == KeyModifiers::SUPER => break 'main,
                         KeyCode::Esc => {
                             state.search_state.cancel();
                             state.mark_search_dirty();
@@ -1261,6 +1264,9 @@ fn run_app_internal(
                             state.mark_search_dirty();
                         }
                         KeyCode::Char('q') | KeyCode::Esc => break 'main,
+                        // Cmd+Up: macOS "back" out of the diff to the picker.
+                        // tmux croft slot 3 injects Up+Super for this chord.
+                        KeyCode::Up if key.modifiers == KeyModifiers::SUPER => break 'main,
                         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                             break 'main
                         }
@@ -2028,7 +2034,7 @@ fn run_app_internal(
                                         title: "Global",
                                         bindings: vec![
                                             KeyBind {
-                                                key: "q / esc",
+                                                key: "q / esc / cmd+up",
                                                 description: "Quit",
                                             },
                                             KeyBind {
