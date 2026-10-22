@@ -292,6 +292,14 @@ impl Theme {
     /// Values assume the monokai palette used by Ghostty/croft: slot 8 is the
     /// muted comment grey #75715e, slot 10 is green #a6e22e, slot 11 is yellow
     /// #e6db74, slot 6 is cyan #66d9ef, slot 1 is the pink/red #f92a72.
+    ///
+    /// The diff fills are the one deliberate exception: monokai has no dim
+    /// variants (slots 1-6 equal 9-14), so the bright `Color::Green` /
+    /// `Color::Red` row backgrounds that the ANSI slots would give make the
+    /// light syntax tokens and white default text unreadable. The added and
+    /// deleted backgrounds (and their gutter and word-emphasis variants) are
+    /// therefore dark monokai-hued RGBs so the bright tokens keep their colour
+    /// and stay legible.
     pub fn ansi() -> Self {
         Self {
             mode: ThemeMode::Dark,
@@ -314,16 +322,16 @@ impl Theme {
                 default_text: Color::White,
             },
             diff: DiffColors {
-                added_bg: Color::Green,
-                added_gutter_bg: Color::LightGreen,
-                added_gutter_fg: Color::Black,
-                deleted_bg: Color::Red,
-                deleted_gutter_bg: Color::LightRed,
-                deleted_gutter_fg: Color::Black,
+                added_bg: Color::Rgb(24, 44, 16),
+                added_gutter_bg: Color::Rgb(36, 66, 26),
+                added_gutter_fg: Color::Rgb(170, 226, 120),
+                deleted_bg: Color::Rgb(56, 22, 40),
+                deleted_gutter_bg: Color::Rgb(84, 32, 58),
+                deleted_gutter_fg: Color::Rgb(250, 152, 190),
                 context_bg: Color::Reset,
                 empty_placeholder_fg: Color::DarkGray,
-                added_word_bg: Color::LightGreen,
-                deleted_word_bg: Color::LightRed,
+                added_word_bg: Color::Rgb(44, 78, 30),
+                deleted_word_bg: Color::Rgb(104, 40, 70),
             },
             ui: UiColors {
                 border_focused: Color::Yellow,
@@ -1047,4 +1055,70 @@ pub fn init(config_theme: Option<&str>) {
 
 pub fn get() -> &'static Theme {
     THEME.get_or_init(|| Theme::from_mode(ThemeMode::detect()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn channel(c: u8) -> f32 {
+        let c = c as f32 / 255.0;
+        if c <= 0.03928 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    fn luminance(color: Color) -> f32 {
+        match color {
+            Color::Rgb(r, g, b) => {
+                0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+            }
+            Color::White => 1.0,
+            Color::Black => 0.0,
+            other => panic!("ansi diff colours must be concrete RGB, got {other:?}"),
+        }
+    }
+
+    fn contrast_ratio(a: Color, b: Color) -> f32 {
+        let (la, lb) = (luminance(a), luminance(b));
+        let (hi, lo) = if la >= lb { (la, lb) } else { (lb, la) };
+        (hi + 0.05) / (lo + 0.05)
+    }
+
+    /// The ansi preset's diff fills must be dark RGBs so the bright monokai
+    /// syntax tokens and white default text stay readable on them. Guards
+    /// against regressing to the bright `Color::Green` / `Color::Red` slots,
+    /// which silently washed the text out.
+    #[test]
+    fn ansi_diff_rows_stay_readable() {
+        let t = Theme::ansi();
+
+        for fill in [
+            t.diff.added_bg,
+            t.diff.deleted_bg,
+            t.diff.added_gutter_bg,
+            t.diff.deleted_gutter_bg,
+            t.diff.added_word_bg,
+            t.diff.deleted_word_bg,
+        ] {
+            assert!(
+                matches!(fill, Color::Rgb(..)),
+                "expected a concrete RGB diff fill, got {fill:?}"
+            );
+        }
+
+        // White body text clears WCAG AA on both row fills.
+        assert!(contrast_ratio(t.syntax.default_text, t.diff.added_bg) >= 4.5);
+        assert!(contrast_ratio(t.syntax.default_text, t.diff.deleted_bg) >= 4.5);
+
+        // Gutter text reads on its (now dark) gutter fill.
+        assert!(contrast_ratio(t.diff.added_gutter_fg, t.diff.added_gutter_bg) >= 3.0);
+        assert!(contrast_ratio(t.diff.deleted_gutter_fg, t.diff.deleted_gutter_bg) >= 3.0);
+
+        // Word emphasis stays a visibly lighter shade of the same fill.
+        assert!(luminance(t.diff.added_word_bg) > luminance(t.diff.added_bg));
+        assert!(luminance(t.diff.deleted_word_bg) > luminance(t.diff.deleted_bg));
+    }
 }
